@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Préparation AI-900</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 1.5rem;
+            position: relative;
+        }
+        .header img {
+            height: 60px;
+            margin-bottom: 1rem;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            text-align: center;
+        }
+        #timer {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ef4444;
+        }
+        .question-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .code-snippet {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            font-size: 0.9em;
+        }
+        .option-label {
+            display: block;
+            padding: 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .option-label:hover {
+            background-color: #f9fafb;
+        }
+        .option-input:checked + .option-label {
+            background-color: #e0f2fe;
+            border-color: #3b82f6;
+        }
+        .option-input {
+            display: none;
+        }
+        .correct {
+            background-color: #dcfce7 !important;
+            border-color: #22c55e !important;
+        }
+        .incorrect {
+            background-color: #fee2e2 !important;
+            border-color: #ef4444 !important;
+        }
+        .action-btn {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            text-align: center;
+            border: none;
+        }
+        .action-btn:hover {
+            background-color: #2563eb;
+        }
+        .action-btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .result-card {
+            padding: 2rem;
+            border-radius: 0.75rem;
+            text-align: center;
+        }
+        #welcome-screen input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="quiz-container">
+        <div class="header">
+            <img src="https://iteam-intranet.tn/moodle/pluginfile.php/1/theme_adaptable/logo/1746744125/logo-iteams.png" alt="Logo Iteam University" onerror="this.style.display='none'">
+            <h1>Préparation à la certification AI-900<br>Dr. Mohamed BEN ALI</h1>
+            <div id="timer" class="hidden">40:00</div>
+        </div>
+
+        <div id="welcome-screen">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">Bienvenue au Quiz AI-900</h2>
+            <p class="text-center text-gray-500 mb-6">Veuillez entrer votre nom complet pour commencer.</p>
+            <input type="text" id="student-name" placeholder="Votre nom et prénom">
+            <button id="start-button" class="action-btn" disabled>Commencer le Quiz</button>
+        </div>
+
+        <div id="quiz-app" class="hidden">
+            <div id="quiz-content">
+                <!-- Les questions seront injectées ici -->
+            </div>
+            <button id="submit-button" class="action-btn mt-4">Soumettre les réponses</button>
+            <div id="results-container" class="hidden mt-8"></div>
+        </div>
+    </div>
+    
+    <!-- Scripts Firebase -->
+    <script type="module">
+        // Import des fonctions Firebase nécessaires
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- ÉTAPE 1: Configuration de Firebase ---
+        const firebaseConfig = {
+            apiKey: "VOTRE_API_KEY",
+            authDomain: "VOTRE_PROJECT_ID.firebaseapp.com",
+            projectId: "VOTRE_PROJECT_ID",
+            storageBucket: "VOTRE_PROJECT_ID.appspot.com",
+            messagingSenderId: "VOTRE_SENDER_ID",
+            appId: "VOTRE_APP_ID"
+        };
+        // -----------------------------------------
+
+        let app, db;
+        try {
+            if (firebaseConfig.apiKey !== "VOTRE_API_KEY") {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                console.log("Firebase initialisé avec succès.");
+            } else {
+                console.warn("Configuration Firebase non détectée. Les scores ne seront pas sauvegardés.");
+            }
+        } catch (e) {
+            console.error("Erreur d'initialisation de Firebase.", e);
+        }
+        
+        const quizData = [
+            // IA Fondamentale et IA Responsable
+            { question: "Une entreprise développe un bot de chat pour répondre aux questions courantes des clients. Quel avantage commercial principal peut-elle en attendre ?", options: ["Augmentation des ventes", "Réduction de la charge de travail pour les agents du service client", "Amélioration de la fiabilité du produit"], answer: "Réduction de la charge de travail pour les agents du service client" },
+            { question: "Pour vous assurer qu'un modèle de Machine Learning respecte le principe de transparence de Microsoft, que devez-vous faire dans l'interface de ML automatisé ?", options: ["Définir le type de validation sur 'Auto'", "Activer 'Expliquer le meilleur modèle'", "Définir la métrique principale sur 'accuracy'", "Définir le nombre maximal d'itérations simultanées à 0"], answer: "Activer 'Expliquer le meilleur modèle'" },
+            { question: "Concevoir un système d'IA qui peut être utilisé par tous, y compris les personnes ayant des déficiences auditives ou visuelles, est un exemple de quel principe de l'IA responsable ?", options: ["Équité (Fairness)", "Inclusivité (Inclusiveness)", "Fiabilité et sécurité (Reliability and safety)", "Responsabilité (Accountability)"], answer: "Inclusivité (Inclusiveness)" },
+            { question: "La gestion des valeurs inhabituelles ou manquantes fournies à un système d'IA est une considération pour quel principe de l'IA responsable de Microsoft ?", options: ["Inclusivité", "Confidentialité et sécurité", "Fiabilité et sécurité", "Transparence"], answer: "Fiabilité et sécurité" },
+            { question: "Quel principe de l'IA responsable stipule que les systèmes ne doivent pas refléter les biais des ensembles de données utilisés pour les entraîner ?", options: ["Responsabilité", "Équité", "Inclusivité", "Transparence"], answer: "Équité" },
+            { question: "Fournir une explication du résultat d'une demande de prêt est un exemple de quel principe de l'IA responsable ?", options: ["Transparence", "Inclusivité", "Équité", "Confidentialité et sécurité"], answer: "Transparence" },
+            { question: "Assurer que les données personnelles ne sont visibles que par les utilisateurs approuvés correspond à quel principe de l'IA responsable ?", options: ["Équité", "Confidentialité et sécurité", "Fiabilité et sécurité", "Transparence"], answer: "Confidentialité et sécurité" },
+            { question: "Mettre en place des processus pour garantir que les décisions prises par les systèmes d'IA peuvent être annulées par des humains relève de quel principe ?", options: ["Responsabilité", "Équité", "Inclusivité", "Fiabilité et sécurité"], answer: "Responsabilité" },
+
+            // Machine Learning : Classification, Régression, Clustering
+            { question: "Comment devez-vous diviser les données pour l'entraînement et l'évaluation d'un modèle de Machine Learning ?", options: ["Utiliser les caractéristiques (features) pour l'entraînement et les étiquettes (labels) pour l'évaluation", "Diviser aléatoirement les données en lignes pour l'entraînement et en lignes pour l'évaluation", "Utiliser les étiquettes pour l'entraînement et les caractéristiques pour l'évaluation", "Diviser aléatoirement les données en colonnes pour l'entraînement et en colonnes pour l'évaluation"], answer: "Diviser aléatoirement les données en lignes pour l'entraînement et en lignes pour l'évaluation" },
+            { question: "Prédire si un patient développera du diabète en fonction de ses antécédents médicaux est un exemple de :", options: ["Régression", "Clustering", "Classification", "Détection d'anomalies"], answer: "Classification" },
+            { question: "Vous devez prédire le niveau de la mer en mètres pour les 10 prochaines années. Quel type de Machine Learning devriez-vous utiliser ?", options: ["Classification", "Régression", "Clustering"], answer: "Régression" },
+            { question: "Un système bancaire qui prédit si un prêt sera remboursé est un exemple de quel type de Machine Learning ?", options: ["Classification", "Régression", "Clustering"], answer: "Classification" },
+            { question: "Vous voulez prédire le nombre de cartes-cadeaux qui seront vendues le mois prochain. Quel type de Machine Learning est le plus approprié ?", options: ["Classification", "Régression", "Clustering"], answer: "Régression" },
+            { question: "Dans un ensemble de données sur les trajets en taxi, pour prédire le prix de la course, que devriez-vous utiliser comme caractéristique (feature) ?", options: ["Le nombre de trajets dans le jeu de données", "La distance du trajet", "Le prix de la course", "L'ID du trajet"], answer: "La distance du trajet" },
+            { question: "Les valeurs de données qui influencent la prédiction d'un modèle sont appelées :", options: ["Variables dépendantes", "Caractéristiques (features)", "Identifiants", "Étiquettes (labels)"], answer: "Caractéristiques (features)" },
+            { question: "Le processus de marquage des données d'entraînement avec des valeurs connues s'appelle :", options: ["Ingénierie des caractéristiques", "Entraînement", "Étiquetage (Labelling)", "Évaluation"], answer: "Étiquetage (Labelling)" },
+            
+            // Vision par Ordinateur (Computer Vision)
+            { question: "Retourner une boîte englobante (bounding box) qui indique l'emplacement d'un véhicule dans une image est un exemple de :", options: ["Classification d'images", "Détection d'objets", "Reconnaissance Optique de Caractères (OCR)", "Segmentation sémantique"], answer: "Détection d'objets" },
+            { question: "Quel service devez-vous utiliser pour analyser des images afin de détecter la présence d'un ou plusieurs visages et de vérifier si au moins une personne porte des lunettes de soleil ?", options: ["L'opération Verify du service Face", "L'opération Detect du service Face", "L'opération Describe Image du service Computer Vision", "L'opération Analyze Image du service Computer Vision"], answer: "L'opération Analyze Image du service Computer Vision" },
+            { question: "Identifier des lettres manuscrites dans une image est une tâche de :", options: ["Détection d'anomalies", "Vision par ordinateur", "Régression", "Traitement du langage naturel"], answer: "Vision par ordinateur" },
+            { question: "Déterminer si une photo contient une personne est une charge de travail de type :", options: ["Détection d'anomalies", "Vision par ordinateur", "Exploration de connaissances (Knowledge mining)", "Traitement du langage naturel"], answer: "Vision par ordinateur" },
+            { question: "Quel service Azure AI est spécifiquement conçu pour extraire du texte, des paires clé-valeur et des données de tableau à partir de documents numérisés comme des factures ?", options: ["Azure AI Document Intelligence (anciennement Form Recognizer)", "Azure AI Language", "Azure AI Vision", "Azure AI Custom Vision"], answer: "Azure AI Document Intelligence (anciennement Form Recognizer)" },
+
+            // Traitement du Langage Naturel (NLP)
+            { question: "Quel service est utilisé pour extraire des dates, des quantités et des lieux à partir d'un texte ?", options: ["Extraction de phrases clés", "Détection de la langue", "Reconnaissance d'entités nommées (NER)", "Analyse des sentiments"], answer: "Reconnaissance d'entités nommées (NER)" },
+            { question: "Prédire le sentiment (positif, négatif, neutre) d'un message sur les réseaux sociaux est une tâche de :", options: ["Vision par ordinateur", "Traitement du langage naturel", "Détection d'anomalies", "Régression"], answer: "Traitement du langage naturel" },
+            { question: "Déterminer si un avis de client est positif ou négatif est une charge de travail de type :", options: ["Détection d'anomalies", "Vision par ordinateur", "Exploration de connaissances (Knowledge mining)", "Traitement du langage naturel"], answer: "Traitement du langage naturel" },
+            { question: "Vous souhaitez créer un chatbot automatisé pour répondre aux questions sur les remboursements et les échanges. Quel type de charge de travail IA est-ce ?", options: ["Détection d'anomalies", "Vision par ordinateur", "IA Conversationnelle", "Traitement du langage naturel"], answer: "IA Conversationnelle" },
+
+            // Services Azure et Concepts de ML
+            { question: "Identifier des transactions de carte de crédit frauduleuses en recherchant des écarts par rapport aux habitudes est un exemple de :", options: ["Classification", "Régression", "Détection d'anomalies", "Traitement du langage naturel"], answer: "Détection d'anomalies" },
+            { question: "La prévision des prix des logements sur la base de données historiques est un exemple de :", options: ["Détection d'anomalies", "Classification", "Régression", "Clustering"], answer: "Régression" },
+            { question: "L'identification de connexions suspectes en recherchant des écarts par rapport aux habitudes habituelles est un exemple de :", options: ["Détection d'anomalies", "Classification", "Régression", "Clustering"], answer: "Détection d'anomalies" },
+            { question: "Quel processus est utilisé pour générer des caractéristiques supplémentaires à partir de données existantes ?", options: ["Ingénierie des caractéristiques (Feature engineering)", "Sélection des caractéristiques (Feature selection)", "Évaluation de modèle", "Entraînement de modèle"], answer: "Ingénierie des caractéristiques (Feature engineering)" },
+            { question: "Dans quel ordre devez-vous effectuer ces trois processus pour déployer un modèle Azure Machine Learning ?", options: ["Entraînement, Évaluation, Préparation des données", "Préparation des données, Entraînement, Évaluation", "Évaluation, Entraînement, Préparation des données", "Entraînement, Préparation des données, Évaluation"], answer: "Préparation des données, Entraînement, Évaluation" },
+            { question: "Choisir la température et la pression pour entraîner un modèle météorologique est un exemple de :", options: ["Ingénierie des caractéristiques", "Sélection des caractéristiques", "Déploiement de modèle", "Évaluation de modèle"], answer: "Sélection des caractéristiques" },
+            { question: "L'examen des valeurs d'une matrice de confusion est une étape de :", options: ["Ingénierie des caractéristiques", "Sélection des caractéristiques", "Déploiement de modèle", "Évaluation de modèle"], answer: "Évaluation de modèle" },
+            { question: "Diviser une date en champs 'mois', 'jour' et 'année' est une tâche de :", options: ["Ingénierie des caractéristiques", "Sélection des caractéristiques", "Entraînement de modèle", "Évaluation de modèle"], answer: "Ingénierie des caractéristiques" },
+            { question: "Le ML automatisé est le processus d'automatisation des tâches longues et itératives du développement de modèles de Machine Learning.", options: ["Vrai", "Faux"], answer: "Vrai" },
+            { question: "Vous ne devriez PAS évaluer un modèle en utilisant les mêmes données que celles utilisées pour l'entraîner.", options: ["Vrai", "Faux"], answer: "Vrai" },
+            { question: "La métrique 'accuracy' (précision globale) n'est pas toujours la métrique principale utilisée pour mesurer la performance d'un modèle.", options: ["Vrai", "Faux"], answer: "Vrai" },
+            { question: "Un graphique 'Prédit vs Réel' pour un modèle de régression montre que les points sont étroitement regroupés autour d'une ligne diagonale. Qu'est-ce que cela indique ?", options: ["Le modèle a une faible précision.", "Le modèle est très performant.", "Le modèle est un modèle de classification.", "Les données ne sont pas normalisées."], answer: "Le modèle est très performant." },
+            { question: "Dans une matrice de confusion avec 13951 Vrais Négatifs, 1033 Vrais Positifs, 11 Faux Positifs et 5 Faux Négatifs, combien y a-t-il de prédictions positives correctes ?", options: ["5", "11", "1033", "13951"], answer: "1033" },
+            { question: "Avec la même matrice de confusion (VP=1033, VN=13951, FP=11, FN=5), combien y a-t-il de faux négatifs ?", options: ["5", "11", "1033", "13951"], answer: "5" },
+            
+            // NOUVELLES QUESTIONS TECHNIQUES
+            // Transformers
+            { question: "Dans l'architecture Transformer, quel est le rôle principal du 'Positional Encoding' ?", options: ["Augmenter la taille du vocabulaire", "Injecter des informations sur la position relative ou absolue des tokens dans la séquence", "Calculer les scores d'attention", "Normaliser les sorties de la couche"], answer: "Injecter des informations sur la position relative ou absolue des tokens dans la séquence" },
+            { question: "Quel est le principal avantage du mécanisme d'auto-attention (self-attention) des Transformers par rapport aux réseaux de neurones récurrents (RNN) pour le traitement des séquences ?", options: ["Il est plus simple à mettre en œuvre", "Il consomme moins de mémoire", "Il traite tous les tokens d'une séquence simultanément (parallélisation) et capture les dépendances à longue distance plus efficacement", "Il est uniquement adapté aux séquences courtes"], answer: "Il traite tous les tokens d'une séquence simultanément (parallélisation) et capture les dépendances à longue distance plus efficacement" },
+            { question: "Dans le mécanisme d'attention, à quoi servent les vecteurs 'Query', 'Key' et 'Value' ?", options: ["Query représente le mot courant, Key représente tous les autres mots, et Value est la sortie", "Ils sont utilisés pour calculer un score de similarité entre le token courant (Query) et les autres tokens (Keys), puis pour pondérer leurs représentations (Values)", "Ce sont trois types de couches de neurones distinctes", "Ils servent uniquement à l'encodage des mots"], answer: "Ils sont utilisés pour calculer un score de similarité entre le token courant (Query) et les autres tokens (Keys), puis pour pondérer leurs représentations (Values)" },
+            
+            // Code ML & Transformer
+            { question: "Examinez ce code Python. À quoi sert la bibliothèque `transformers` dans ce contexte ?<div class='code-snippet'>from transformers import pipeline<br>classifier = pipeline('sentiment-analysis')<br>result = classifier('I love the new Azure AI services!')</div>", options: ["À créer des visualisations de données", "À fournir une interface simplifiée pour utiliser des modèles pré-entraînés (comme BERT) pour diverses tâches NLP", "À se connecter à une base de données SQL", "À nettoyer des données brutes"], answer: "À fournir une interface simplifiée pour utiliser des modèles pré-entraînés (comme BERT) pour diverses tâches NLP" },
+            { question: "Quel est le but de la ligne `model.fit(X_train, y_train)` dans ce code scikit-learn ?<div class='code-snippet'>from sklearn.ensemble import RandomForestClassifier<br>model = RandomForestClassifier()<br>model.fit(X_train, y_train)</div>", options: ["Prédire de nouvelles valeurs", "Évaluer la performance du modèle", "Entraîner le modèle de classification en utilisant les données d'entraînement et leurs étiquettes", "Diviser les données en ensembles d'entraînement et de test"], answer: "Entraîner le modèle de classification en utilisant les données d'entraînement et leurs étiquettes" },
+            { question: "Dans le contexte des grands modèles de langage (LLM), que signifie le 'fine-tuning' (ajustement fin) ?", options: ["Ré-entraîner un modèle à partir de zéro avec de nouvelles données", "Adapter un modèle pré-entraîné à une tâche spécifique en le ré-entraînant sur un plus petit jeu de données pertinent", "Choisir le meilleur modèle parmi plusieurs options", "Compresser la taille du modèle"], answer: "Adapter un modèle pré-entraîné à une tâche spécifique en le ré-entraînant sur un plus petit jeu de données pertinent" },
+
+            // Scénarios réels sur Azure
+            { question: "Une entreprise de vente au détail souhaite analyser des milliers d'avis clients pour identifier les principaux sujets de discussion et les problèmes émergents. Quelle est la meilleure approche avec les services Azure AI ?", options: ["Utiliser Azure AI Vision pour lire le texte des avis", "Utiliser Azure AI Speech pour transcrire les avis", "Utiliser le service Azure AI Language pour l'extraction de phrases clés, l'analyse des sentiments et la modélisation de sujets", "Utiliser Azure Machine Learning pour construire un modèle de régression"], answer: "Utiliser le service Azure AI Language pour l'extraction de phrases clés, l'analyse des sentiments et la modélisation de sujets" },
+            { question: "Une société d'énergie doit surveiller ses pipelines à distance à l'aide de drones pour détecter les fuites. Le système doit identifier des fissures spécifiques ou des déversements. Quel service Azure est le plus approprié pour entraîner un modèle personnalisé pour cette tâche ?", options: ["Azure AI Language", "Azure AI Custom Vision", "Azure AI Face", "Azure AI Document Intelligence"], answer: "Azure AI Custom Vision" },
+            { question: "Une entreprise de logistique veut créer un assistant vocal pour ses employés d'entrepôt. L'assistant doit comprendre des commandes en plusieurs langues. Quelle combinaison de services Azure est nécessaire ?", options: ["Azure AI Vision et Azure AI Language", "Azure AI Speech (pour la reconnaissance et la synthèse vocale) et Azure AI Language (pour la compréhension des commandes)", "Uniquement Azure Machine Learning", "Azure Bot Service et Azure Functions"], answer: "Azure AI Speech (pour la reconnaissance et la synthèse vocale) et Azure AI Language (pour la compréhension des commandes)" },
+            { question: "Une banque veut automatiser le traitement des demandes de prêt soumises sous forme de formulaires PDF. Elle doit extraire le nom du demandeur, le montant demandé et les revenus annuels. Quel service Azure est conçu pour cela ?", options: ["Azure AI Vision (OCR simple)", "Azure AI Language", "Azure AI Document Intelligence", "Azure AI Search"], answer: "Azure AI Document Intelligence" },
+            { question: "Une plateforme de e-commerce veut offrir des recommandations de produits personnalisées en temps réel à ses utilisateurs. Quel concept d'IA est au cœur de cette fonctionnalité ?", options: ["Systèmes de recommandation (basés sur le filtrage collaboratif ou de contenu)", "Détection d'anomalies", "Classification d'images", "Analyse de sentiments"], answer: "Systèmes de recommandation (basés sur le filtrage collaboratif ou de contenu)" },
+            { question: "Quel service Azure permet d'ingérer des données provenant de diverses sources (PDF, JSON, etc.), de les enrichir avec des compétences IA (comme l'OCR ou la reconnaissance d'entités) et de les rendre consultables via un index ?", options: ["Azure Data Factory", "Azure Synapse Analytics", "Azure AI Search", "Azure Cosmos DB"], answer: "Azure AI Search" },
+            { question: "Dans le service Azure OpenAI, quel est le principal avantage de l'approche 'Retrieval-Augmented Generation' (RAG) ?", options: ["Elle rend le modèle plus rapide", "Elle permet au modèle de répondre en se basant sur des données externes et à jour que vous lui fournissez, réduisant ainsi les 'hallucinations'", "Elle traduit les réponses dans plusieurs langues", "Elle ne fonctionne qu'avec des données textuelles"], answer: "Elle permet au modèle de répondre en se basant sur des données externes et à jour que vous lui fournissez, réduisant ainsi les 'hallucinations'" },
+            { question: "Une entreprise souhaite évaluer la clarté et la prononciation de ses agents de centre d'appels lors des conversations avec les clients. Quelle fonctionnalité d'Azure AI Speech est la plus adaptée ?", options: ["Synthèse vocale neuronale", "Reconnaissance de l'orateur", "Évaluation de la prononciation", "Traduction vocale"], answer: "Évaluation de la prononciation" },
+            { question: "Quelle est la principale différence entre Azure AI Studio et Azure Machine Learning Studio ?", options: ["Il n'y a pas de différence, ce sont les mêmes produits", "Azure AI Studio est axé sur l'utilisation et l'intégration de modèles de base (comme les LLMs), tandis qu'Azure Machine Learning Studio est une plateforme plus large pour construire, entraîner et gérer des modèles ML personnalisés de A à Z", "Azure AI Studio est gratuit, tandis qu'Azure Machine Learning Studio est payant", "Azure AI Studio ne prend en charge que le code, tandis qu'Azure Machine Learning Studio est uniquement low-code"], answer: "Azure AI Studio est axé sur l'utilisation et l'intégration de modèles de base (comme les LLMs), tandis qu'Azure Machine Learning Studio est une plateforme plus large pour construire, entraîner et gérer des modèles ML personnalisés de A à Z" }
+        ];
+
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const quizApp = document.getElementById('quiz-app');
+        const studentNameInput = document.getElementById('student-name');
+        const startButton = document.getElementById('start-button');
+        
+        const quizContent = document.getElementById('quiz-content');
+        const submitButton = document.getElementById('submit-button');
+        const resultsContainer = document.getElementById('results-container');
+        const timerElement = document.getElementById('timer');
+
+        let studentName = '';
+        let shuffledQuestions = [];
+        let timerInterval;
+        let timeLeft = 40 * 60; // 40 minutes in seconds
+
+        studentNameInput.addEventListener('input', () => {
+            startButton.disabled = studentNameInput.value.trim() === '';
+        });
+
+        startButton.addEventListener('click', () => {
+            studentName = studentNameInput.value.trim();
+            if (studentName) {
+                welcomeScreen.classList.add('hidden');
+                quizApp.classList.remove('hidden');
+                timerElement.classList.remove('hidden');
+                buildQuiz();
+                startTimer();
+            }
+        });
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                seconds = seconds < 10 ? '0' + seconds : seconds;
+
+                timerElement.textContent = `${minutes}:${seconds}`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    showResults();
+                }
+            }, 1000);
+        }
+
+        function buildQuiz() {
+            quizContent.innerHTML = '';
+            resultsContainer.innerHTML = '';
+            resultsContainer.classList.add('hidden');
+            submitButton.style.display = 'block';
+            submitButton.disabled = false;
+            submitButton.textContent = "Soumettre les réponses";
+
+            shuffledQuestions = [...quizData].sort(() => Math.random() - 0.5);
+            
+            shuffledQuestions.forEach((currentQuestion, questionIndex) => {
+                const optionsHtml = currentQuestion.options.map((option, optionIndex) => `
+                    <div>
+                        <input type="radio" name="question${questionIndex}" id="q${questionIndex}o${optionIndex}" value="${option}" class="option-input">
+                        <label for="q${questionIndex}o${optionIndex}" class="option-label">${option}</label>
+                    </div>
+                `).join('');
+
+                const questionHtml = `
+                    <div class="question-card" data-question-index="${questionIndex}">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">${questionIndex + 1}. ${currentQuestion.question}</h3>
+                        <div class="options-container">${optionsHtml}</div>
+                    </div>
+                `;
+                quizContent.innerHTML += questionHtml;
+            });
+        }
+
+        async function showResults() {
+            clearInterval(timerInterval); // Stop the timer
+            submitButton.disabled = true;
+            submitButton.textContent = "Correction en cours...";
+            let score = 0;
+            
+            shuffledQuestions.forEach((currentQuestion, questionIndex) => {
+                const questionCard = quizContent.querySelector(`.question-card[data-question-index="${questionIndex}"]`);
+                const optionsContainer = questionCard.querySelector('.options-container');
+                const selectedOption = optionsContainer.querySelector(`input[name="question${questionIndex}"]:checked`);
+                
+                const allOptions = optionsContainer.querySelectorAll('input');
+                allOptions.forEach(opt => opt.disabled = true);
+
+                const correctOptionInput = Array.from(allOptions).find(input => input.value === currentQuestion.answer);
+
+                if (selectedOption) {
+                    const userAnswer = selectedOption.value;
+                    const selectedLabel = selectedOption.nextElementSibling;
+
+                    if (userAnswer === currentQuestion.answer) {
+                        score++;
+                        selectedLabel.classList.add('correct');
+                    } else {
+                        selectedLabel.classList.add('incorrect');
+                        if(correctOptionInput) {
+                           correctOptionInput.nextElementSibling.classList.add('correct');
+                        }
+                    }
+                } else {
+                     if(correctOptionInput) {
+                         correctOptionInput.nextElementSibling.classList.add('correct');
+                     }
+                }
+            });
+
+            const percentage = Math.round((score / shuffledQuestions.length) * 100);
+            
+            let resultMessage = '';
+            let resultColorClass = '';
+
+            if (percentage >= 70) {
+                resultMessage = "Excellent travail ! Vous êtes prêt pour la certification.";
+                resultColorClass = 'bg-green-100 text-green-800';
+            } else if (percentage >= 50) {
+                resultMessage = "Pas mal, mais vous pouvez vous améliorer sur certains points.";
+                resultColorClass = 'bg-yellow-100 text-yellow-800';
+            } else {
+                resultMessage = "Vous devriez peut-être réviser un peu plus.";
+                resultColorClass = 'bg-red-100 text-red-800';
+            }
+
+            resultsContainer.innerHTML = `
+                <div class="result-card ${resultColorClass}">
+                    <h2 class="text-2xl font-bold mb-2">Résultats pour ${studentName}</h2>
+                    <p class="text-3xl font-bold my-4">${score} / ${shuffledQuestions.length}</p>
+                    <p class="text-xl font-semibold mb-4">(${percentage}%)</p>
+                    <p class="text-lg">${resultMessage}</p>
+                </div>
+            `;
+            resultsContainer.classList.remove('hidden');
+            submitButton.style.display = 'none';
+            timerElement.classList.add('hidden');
+
+
+            if (db) {
+                try {
+                    await addDoc(collection(db, "quizResults"), {
+                        studentName: studentName,
+                        score: score,
+                        totalQuestions: shuffledQuestions.length,
+                        percentage: percentage,
+                        submittedAt: serverTimestamp()
+                    });
+                    console.log("Résultats enregistrés avec succès dans Firebase.");
+                } catch (e) {
+                    console.error("Erreur lors de l'enregistrement dans Firebase: ", e);
+                }
+            }
+        }
+
+        submitButton.addEventListener('click', showResults);
+    </script>
+</body>
+</html>
